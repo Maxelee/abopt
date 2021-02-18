@@ -290,6 +290,7 @@ class Problem(object):
         self.rtol = rtol
         self.xtol = xtol
         self.gtol = gtol
+        self.rolling = None
 
     def Px2x(self, Px):
         return self._precond.vPp(Px, direction=-1)
@@ -433,8 +434,17 @@ class Optimizer(object):
         if prop.dxnorm <= problem.xtol:
             return ConvergedIteration("Solution stopped moving")
 
+        if problem.rolling:
+            try:
+                prop.y = np.mean(state.y_[-problem.rolling:])
+                state.y = np.mean(state.y_)
+            except:
+                state.y = np.mean(state.y_[:-1])
+                prop.y = np.mean(state.y_)
+
         if problem.check_convergence(state.y, prop.y):
             return ConvergedIteration("Objective stopped improving")
+
 
         return ContinueIteration("continue iteration")
 
