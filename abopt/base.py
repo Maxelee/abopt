@@ -17,6 +17,7 @@
     if a parameters shall be adjusted, then it belongs to the problem;
     if it shall not be adjusted, then it belongs to the optimizer.
 """
+import numpy as np
 
 class ContinueIteration(str): pass
 class ConvergedIteration(str): pass
@@ -294,6 +295,7 @@ class Problem(object):
         xtol=1e-7,
         gtol=1e-8,
         precond=None,
+        rolling=None
         ):
         if precond is None:
             precond = Preconditioner(lambda x, direction:x, lambda x, direction:x)
@@ -325,7 +327,7 @@ class Problem(object):
         self.rtol = rtol
         self.xtol = xtol
         self.gtol = gtol
-        self.rolling = None
+        self.rolling = rolling
 
     def Px2x(self, Px):
         return self._precond.vPp(Px, direction=-1)
@@ -440,8 +442,8 @@ class Optimizer(object):
 
         state.y_.append(prop.y)
 
-        if len(state.y_) > 2: # only store a short history
-            del state.y_[0]
+        #if len(state.y_) > 2: # only store a short history
+        #    del state.y_[0]
 
         state.y = prop.y
         state.dy = prop.dy
@@ -475,14 +477,20 @@ class Optimizer(object):
             return ConvergedIteration("Solution stopped moving")
 
         if problem.rolling:
-            try:
-                prop.y = np.mean(state.y_[-problem.rolling:])
-                state.y = np.mean(state.y_)
-            except:
-                state.y = np.mean(state.y_[:-1])
-                prop.y = np.mean(state.y_)
+            if len(state.y_) > problem.rolling:
+                prop_y = np.mean(state.y_[-problem.rolling:])
+                y = np.mean(state.y_[-problem.rolling:-1])
+            elif len(state.y_)==1:
+                y = state.y
+                prop_y = prop.y
+            else:
+                y = np.mean(state.y_[:-1])
+                prop_y = np.mean(state.y_)
+        else:
+            y = state.y
+            prop_y = prop.y
 
-        if problem.check_convergence(state.y, prop.y):
+        if problem.check_convergence(y, prop_y):
             return ConvergedIteration("Objective stopped improving")
 
 
@@ -641,6 +649,3 @@ class VectorSpace(object):
             callers.
 
         """
-        raise NotImplementedError
-
-
